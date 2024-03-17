@@ -1,14 +1,13 @@
+import argparse
 import pandas as pd
 from math import *
 from geopy.distance import geodesic
 import random
 import numpy
 import folium
-import argparse
-import os
+import csv
 
-
-# уже лучше.
+# Уже лучше.
 # TrackLoader содержит какоую-то логику, не связанную с загрузкой данных - он должен вернуть ровно те данные,
 # которые содержатся в файле в виде объектной модели. вся логика постобработки и трансфомрации данных в пригодный
 # для аналища вид, должна быть реализованна в отдлельном классе.
@@ -38,8 +37,8 @@ import os
 #writer.save(args.file_out, sign_groups)
 #
 # воспульзуйтесь модулем argparse дабы вот такого прелести не было
-#file_1 = 'file_in.csv'
-#file_2 = 'file_out.csv'
+#file_1 = 'digest.csv'
+#file_2 = '20230520-203319_predictions.csv'
 
 # import argparse
 # parser = argparse.ArgumentParser()
@@ -81,23 +80,34 @@ class Sign:
         self.y_min = y_min
         self.x_max = x_max
         self.y_max = y_max
-        self.color = color
-        self.x_arr = []
-        self.y_arr = []
-
-    def fill_color(self, clr):
-        self.color = clr
+        self.x_arr = [x]
+        self.y_arr = [y]
+        self.files = [file]
 
 
 class TrackLoader:
     def __init__(self):
-        self.car_data = None
-        self.sign_data = None
+        self.data = None
+
+    def load(self, file1):
+        sniffer = csv.Sniffer()
+        with open(file1) as fp:
+            delimiter = sniffer.sniff(fp.read(5000)).delimiter
+        self.data = pd.read_csv(file1, delimiter=delimiter)
+        return self.data
+
+
+class TrackWithSigns:
+    def __init__(self, track, signs):
+        self.data_track = track
+        self.data_signs = signs
         self.combined_data_frame = None
 
-    def load(self, file1, file2):
-        self.car_data = pd.read_csv(file1, delimiter=';')
-        self.sign_data = pd.read_csv(file2, delimiter=',')
+    def get_data_track(self):
+        return self.data_track
+
+    def get_data_signs(self):
+        return self.data_signs
 
     def renaming(self):
         # преобразование строки вида
@@ -105,13 +115,14 @@ class TrackLoader:
         # к виду "3096_2.jpeg"
         # prevent SettingWithCopyWarning message from appearing
         pd.options.mode.chained_assignment = None
-        for i in range(len(self.sign_data)):
-            self.sign_data['filename'][i] = self.sign_data['filename'][i][self.sign_data['filename'][i].rfind('/') + 1:]
-        self.sign_data = self.sign_data.rename(columns={'filename': 'file'})
+        for i in range(len(self.data_signs)):
+            self.data_signs['filename'][i] = \
+                self.data_signs['filename'][i][self.data_signs['filename'][i].rfind('/') + 1:]
+        self.data_signs = self.data_signs.rename(columns={'filename': 'file'})
 
     def merge_data_frames_and_del_duplicates(self):
         # объединение входных данных в один DataFrame
-        self.combined_data_frame = pd.merge(self.car_data, self.sign_data, on='file', how='inner')
+        self.combined_data_frame = pd.merge(self.data_track, self.data_signs, on='file', how='inner')
         self.combined_data_frame.drop(['offset', 'score', 'speed', 'time', 'altitude', 'class_id'],
                                       axis=1,
                                       inplace=True)
@@ -120,58 +131,44 @@ class TrackLoader:
         self.combined_data_frame = self.combined_data_frame.rename(columns={'x': 'y', 'y': 'x'})
         self.combined_data_frame.index = range(0, len(self.combined_data_frame.values), 1)
 
-    def fill_track(self):
-        # создаем объекты класса трек
-        track = Track()
+    def get_track_with_signs(self):
+        to_out = []
         for elem in self.combined_data_frame.values:
             data = Machine_input(*elem)
             distance_to_sign = distance_to_sign_in_frame(data.x_min, data.x_max)
             new_heading = direction_offset(data.x_min, data.x_max, data.heading, data.file[-6])
             sign_x_coordinate, sign_y_coordinate = sign_coordinate_calculation(distance_to_sign, data.x, data.y,
                                                                                new_heading)
-            track.add_sign(Sign(data.file, sign_x_coordinate, sign_y_coordinate, data.class_name, data.x_min,
-                                data.y_min, data.x_max, data.y_max, None))
-        return track
+            to_out.append(Sign(data.file, sign_x_coordinate, sign_y_coordinate, data.class_name, data.x_min, data.y_min,
+                               data.x_max, data.y_max, None))
+        return to_out
 
 
-class Track:
-
+class SignsMerger:
     def __init__(self):
-        self.signs = []
-
-    def add_sign(self, sign):
-        self.signs.append(sign)
+        self.signs = None
 
     def output(self):
         for elem in self.signs:
             print(elem)
 
-    def sorting(self):
+    def merge_similar_signs(self, data):
+        self.signs = data
         length = len(self.signs)
         max_distance = 10
         i = 0
         while i != length:
             flag = True
             sign_1 = self.signs[i]
-            if sign_1.color is None:
-                sign_1.color = "#" + ''.join([random.choice('0123456789ABCDEF') for j in range(6)])
-                folium.CircleMarker(location=[sign_1.x, sign_1.y], radius=1,
-                                    popup=sign_1.file + "\n" + sign_1.class_name, color=sign_1.color).add_to(map)
-            sign_1.x_arr.append(sign_1.x)
-            sign_1.y_arr.append(sign_1.y)
             for j in range(i + 1, length):
                 sign_2 = self.signs[j]
                 coordinate_sign_1 = (sign_1.x, sign_1.y)
                 coordinate_sign_2 = (sign_2.x, sign_2.y)
                 if sign_1.class_name == sign_2.class_name and \
                         geodesic(coordinate_sign_1, coordinate_sign_2).meters < max_distance:
-                    sign_2.color = sign_1.color
-                    folium.CircleMarker(location=[sign_2.x, sign_2.y], radius=1,
-                                        popup=sign_2.file + "\n" + sign_2.class_name, color=sign_2.color).add_to(map)
                     sign_2.x_arr.extend(sign_1.x_arr)
                     sign_2.y_arr.extend(sign_1.y_arr)
-                    sign_2.x_arr.append(sign_2.x)
-                    sign_2.y_arr.append(sign_2.y)
+                    sign_2.files.extend(sign_1.files)
                     flag = False
                     sign_2.x = (sign_2.x + sign_1.x) / 2
                     sign_2.y = (sign_2.y + sign_1.y) / 2
@@ -179,26 +176,63 @@ class Track:
                     self.signs.pop(i)
                     break
             if flag:
-                self.signs[i] = sign_1
                 i += 1
             else:
                 length = len(self.signs)
+        for i in range(length):
+            sign = self.signs[i]
+            sign.x = numpy.average(sign.x_arr)
+            sign.y = numpy.average(sign.y_arr)
+            self.signs[i] = sign
+        return self.signs
 
-    def fill_track_out_loader(self):
-        dataframe = TrakOutLoader()
-        dataframe.add_data(self.signs)
-        return dataframe
+    def merge_similar_signs_1(self, data):
+        self.signs = data
+        length = len(self.signs)
+        max_distance = 10
+        flag_unique = 1
+        while flag_unique:
+            i = 0
+            flag_unique = 0
+            while i != length:
+                flag = False
+                sign_1 = self.signs[i]
+                for j in range(i + 1, length):
+                    sign_2 = self.signs[j]
+                    coordinate_sign_1 = (sign_1.x, sign_1.y)
+                    coordinate_sign_2 = (sign_2.x, sign_2.y)
+                    if sign_1.class_name == sign_2.class_name and \
+                            geodesic(coordinate_sign_1, coordinate_sign_2).meters < max_distance:
+                        flag_unique = 1
+                        sign_1.x_arr.extend(sign_2.x_arr)
+                        sign_1.y_arr.extend(sign_2.y_arr)
+                        sign_1.files.extend(sign_2.files)
+                        flag = True
+                        sign_1.x = (sign_2.x + sign_1.x) / 2
+                        sign_1.y = (sign_2.y + sign_1.y) / 2
+                        self.signs[i] = sign_1
+                        self.signs.pop(j)
+                        break
+                if flag:
+                    length = len(self.signs)
+                i += 1
+        for i in range(length):
+            sign = self.signs[i]
+            sign.x = numpy.average(sign.x_arr)
+            sign.y = numpy.average(sign.y_arr)
+            self.signs[i] = sign
+        return self.signs
 
 
-# требует доработки
-class TrakOutLoader:
+
+class SignsWriter:
     def __init__(self):
         self.signs = None
 
     def add_data(self, sign):
         self.signs = sign
 
-    def to_csv(self):
+    def save(self):
         df = pd.DataFrame(self.signs, columns=['filename', 'x', 'y', 'class_name', 'x_min', 'y_min', 'x_max', 'y_max',
                                                'color'])
         return df.to_csv('test_final.csv')
@@ -209,8 +243,7 @@ def distance_to_sign_in_frame(x_min, x_max):
     sign_width_pixel = x_max - x_min
     frame_width = 720
     camera_angle = 62
-    distance = (sign_width_metres * frame_width / 2) / (
-                sign_width_pixel * tan(radians(camera_angle / 2))) / 1000
+    distance = (sign_width_metres * frame_width / 2) / (sign_width_pixel * tan(radians(camera_angle / 2))) / 1000
     return distance
 
 
@@ -244,39 +277,51 @@ def sign_coordinate_calculation(distance_to_sign, x_coordinate_of_the_car, y_coo
          y_coordinate_of_the_car) / one_km_in_one_degree_in_longitude, 10)
     return x_coordinate_of_the_sign, y_coordinate_of_the_sign
 
-parser = argparse.ArgumentParser(description='Process some files.')
-parser.add_argument('--file_in', type=str, help='Input file path for car data')
-parser.add_argument('--file_out', type=str, help='Input file path for sign data')
-args = parser.parse_args()
 
-if args.file_in and args.file_out:
-    file_1 = args.file_in
-    file_2 = args.file_out
-else:
-    print("Please provide both input and output file paths using --file_in and --file_out options.")
-    exit()
+def visualization(signs_group):
+    sign_map = folium.Map(location=[signs_group[0].x, signs_group[0].y], zoom_start=15)
+    for sign in signs_group:
+        color = "#" + ''.join([random.choice('0123456789ABCDEF') for j in range(6)])
+        size = len(sign.x_arr)
+        for i in range(size):
+            x = sign.x_arr[i]
+            y = sign.y_arr[i]
+            folium.PolyLine([(x, y), (sign.x, sign.y)],
+                            tooltip=sign.files[i] + "\n" + sign.class_name,
+                            color=color,
+                            weight=1,
+                            opacity=0.8).add_to(sign_map)
+        folium.CircleMarker(location=[sign.x, sign.y], radius=1,
+                            popup=sign.file + "\n" + sign.class_name, color=color).add_to(sign_map)
+    sign_map.save("hello7.html")
 
-if not os.path.exists(1):
-    print(f"Файл '{1}' не существует")
-    # Другие действия, если файл не существует
-    exit()
 
-if not os.path.exists(2):
-    print(f"Файл '{2}' не существует")
-    # Другие действия, если файл не существует
-    exit()
-#file_1 = 'file_in.csv'
-#file_2 = 'file_out.csv'
-a = TrackLoader()
-a.load(file_1, file_2)
-a.renaming()
-a.merge_data_frames_and_del_duplicates()
-b = a.fill_track()
-map = folium.Map(location=[43.595754, 39.734652], zoom_start=15)
-b.sorting()
-for sign in b.signs:
-    folium.CircleMarker(location=[numpy.average(sign.x_arr), numpy.average(sign.y_arr)], radius=4,
-                        popup=sign.file + "\n" + sign.class_name, color=sign.color).add_to(map)
-map.save("hello.html")
-c = b.fill_track_out_loader()
-c.to_csv()
+'''+ '\n' + '\n'.join(sign.files)'''
+# parser = argparse.ArgumentParser(description='Process some files.')
+# parser.add_argument('--file_in', type=str, help='Input file path for car data')
+# parser.add_argument('--file_out', type=str, help='Input file path for sign data')
+# args = parser.parse_args()
+#
+# if args.file_in and args.file_out:
+#     file_1 = args.file_in
+#     file_2 = args.file_out
+# else:
+#     print("Please provide both input and output file paths using --file_in and --file_out options.")
+#     exit()
+import time
+start = time.time()
+file_1 = "digest.csv"
+file_2 = "20230520-203319_predictions.csv"
+loader = TrackLoader()
+data_car = loader.load(file_1)
+data_signs = loader.load(file_2)
+track = TrackWithSigns(data_car, data_signs)
+track.renaming()
+track.merge_data_frames_and_del_duplicates()
+to_merge = track.get_track_with_signs()
+merger = SignsMerger()
+sign_groups = merger.merge_similar_signs_1(to_merge)
+visualization(sign_groups)
+end = time.time()
+print('TIME: ', end - start)
+# python your_script.py --file_in path_to_digest.csv --file_out path_to_20230520-203319_predictions.csv
