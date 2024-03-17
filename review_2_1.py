@@ -4,6 +4,55 @@ from geopy.distance import geodesic
 import random
 import numpy
 import folium
+import argparse
+
+
+# уже лучше.
+# TrackLoader содержит какоую-то логику, не связанную с загрузкой данных - он должен вернуть ровно те данные,
+# которые содержатся в файле в виде объектной модели. вся логика постобработки и трансфомрации данных в пригодный
+# для аналища вид, должна быть реализованна в отдлельном классе.
+# все, что касается самой математики, для этого нужна еще одна сущность которая будет заниматся только этим,
+# на основе моделей полученных после постобработки.
+
+# главная мысль: не надо сувать код в какой-то класс, если он логически не имеет к нему отношения, например
+# метод - sorting в классе Track, зачем он там ? класс Track икапсулирует данные и способ доступа к ним, а
+# sorting это уже частный случай обоботки этих данных.
+#
+#общая логика программы в идеале должна быть примерно такой
+#
+# получаем объектную модель исходных данных
+#loader = TrackLoader()
+#source_track = loader.load(args.track_file)
+#source_signs = loader.load(args.signs_file)
+#
+# получаем объектную модель, пригодную для анализа
+#track = TrackWithSigns(source_track, source_signs)
+#
+# выполняем анализ
+#merger = SignsMerger()
+#sign_groups = merger.merge_similar_signs(merger)
+#
+# пишем результат
+#writer = SigsnWriter()
+#writer.save(args.file_out, sign_groups)
+#
+# воспульзуйтесь модулем argparse дабы вот такого прелести не было
+#file_1 = 'digest.csv'
+#file_2 = '20230520-203319_predictions.csv'
+
+# import argparse
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--file_in")
+# parser.add_argument("--file_out")
+# args = parser.parse_args()
+# args.file_in, args.file_out
+
+# не делеайте таких конструкци - можно же self.sign_data['filename'][i] вынести в отдельную переменную и это станет в мильен раз наглдней
+#self.sign_data['filename'][i] = self.sign_data['filename'][i][self.sign_data['filename'][i].rfind('/') + 1:]
+
+# еще было бы крайне неплохо подготовить мааааленький экзампл - тестовый кейс 2-3 группы занков по 2-3 в каждом,
+# написать bash (или питон) скрипт, который бы запускал скрипт и показывал результат, запаковать это в архив в таком виде,
+# чтобы можно было на любой машине в любой директории распаковать, запустить и он бы корректно отработал
 
 
 class Machine_input:
@@ -85,6 +134,8 @@ class TrackLoader:
 
 
 class Track:
+
+
     def __init__(self):
         self.signs = []
 
@@ -96,11 +147,6 @@ class Track:
             print(elem)
 
     def sorting(self):
-        # В данном методе реализована сортировка знаков по двум признакам: 1) расстояние между знаками (max_distance)
-        # меньше либо равно 5 метров 2) совпадают типы знаков (class_name_of_sign_...).
-        # В случае выполнения обоих условий, знак, по которому производилась сверка (sign_1), удаляется, а информация
-        # о знаке, с которым сверялись, обновляется, т.е. координата знака пересчитывается,
-        # как среднее арифметическое между координатами двух знаков.
         length = len(self.signs)
         max_distance = 10
         i = 0
@@ -144,6 +190,7 @@ class Track:
         return dataframe
 
 
+# требует доработки
 class TrakOutLoader:
     def __init__(self):
         self.signs = None
@@ -197,9 +244,19 @@ def sign_coordinate_calculation(distance_to_sign, x_coordinate_of_the_car, y_coo
          y_coordinate_of_the_car) / one_km_in_one_degree_in_longitude, 10)
     return x_coordinate_of_the_sign, y_coordinate_of_the_sign
 
+parser = argparse.ArgumentParser(description='Process some files.')
+parser.add_argument('--file_in', type=str, help='Input file path for car data')
+parser.add_argument('--file_out', type=str, help='Input file path for sign data')
+args = parser.parse_args()
 
-file_1 = 'digest.csv'
-file_2 = '20230520-203319_predictions.csv'
+if args.file_in and args.file_out:
+    file_1 = args.file_in
+    file_2 = args.file_out
+else:
+    print("Please provide both input and output file paths using --file_in and --file_out options.")
+    exit()
+#file_1 = 'digest.csv'
+#file_2 = '20230520-203319_predictions.csv'
 a = TrackLoader()
 a.load(file_1, file_2)
 a.renaming()
@@ -211,5 +268,5 @@ for sign in b.signs:
     folium.CircleMarker(location=[numpy.average(sign.x_arr), numpy.average(sign.y_arr)], radius=4,
                         popup=sign.file + "\n" + sign.class_name, color=sign.color).add_to(map)
 map.save("hello.html")
-# c = b.fill_track_out_loader()
-# c.to_csv()
+c = b.fill_track_out_loader()
+c.to_csv()
