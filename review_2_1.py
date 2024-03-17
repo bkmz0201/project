@@ -5,6 +5,7 @@ import random
 import numpy
 import folium
 import argparse
+import os
 
 
 # уже лучше.
@@ -37,8 +38,8 @@ import argparse
 #writer.save(args.file_out, sign_groups)
 #
 # воспульзуйтесь модулем argparse дабы вот такого прелести не было
-#file_1 = 'digest.csv'
-#file_2 = '20230520-203319_predictions.csv'
+#file_1 = 'file_in.csv'
+#file_2 = 'file_out.csv'
 
 # import argparse
 # parser = argparse.ArgumentParser()
@@ -134,7 +135,6 @@ class TrackLoader:
 
 
 class Track:
-
 
     def __init__(self):
         self.signs = []
@@ -255,8 +255,18 @@ if args.file_in and args.file_out:
 else:
     print("Please provide both input and output file paths using --file_in and --file_out options.")
     exit()
-#file_1 = 'digest.csv'
-#file_2 = '20230520-203319_predictions.csv'
+
+if not os.path.exists(1):
+    print(f"Файл '{1}' не существует")
+    # Другие действия, если файл не существует
+    exit()
+
+if not os.path.exists(2):
+    print(f"Файл '{2}' не существует")
+    # Другие действия, если файл не существует
+    exit()
+#file_1 = 'file_in.csv'
+#file_2 = 'file_out.csv'
 a = TrackLoader()
 a.load(file_1, file_2)
 a.renaming()

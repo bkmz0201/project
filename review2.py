@@ -175,8 +175,8 @@ def sign_coordinate_calculation(distance_to_sign, x_coordinate_of_the_car, y_coo
     return x_coordinate_of_the_sign, y_coordinate_of_the_sign
 
 
-file_1 = 'digest.csv'
-file_2 = '20230520-203319_predictions.csv'
+file_1 = 'file_in.csv'
+file_2 = 'file_out.csv'
 a = TrackLoader()
 a.load(file_1, file_2)
 a.renaming()
