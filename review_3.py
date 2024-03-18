@@ -6,6 +6,7 @@ import random
 import numpy
 import folium
 import csv
+import time
 
 # Уже лучше.
 # TrackLoader содержит какоую-то логику, не связанную с загрузкой данных - он должен вернуть ровно те данные,
@@ -80,12 +81,9 @@ class Sign:
         self.y_min = y_min
         self.x_max = x_max
         self.y_max = y_max
-        self.color = color
-        self.x_arr = []
-        self.y_arr = []
-
-    def fill_color(self, clr):
-        self.color = clr
+        self.x_arr = [x]
+        self.y_arr = [y]
+        self.files = [file]
 
 
 class TrackLoader:
@@ -119,8 +117,9 @@ class TrackWithSigns:
         # prevent SettingWithCopyWarning message from appearing
         pd.options.mode.chained_assignment = None
         for i in range(len(self.data_signs)):
-            self.data_signs['filename'][i] = \
-                self.data_signs['filename'][i][self.data_signs['filename'][i].rfind('/') + 1:]
+            new_file_name = self.data_signs['filename'][i]
+            new_file_name = new_file_name[new_file_name.rfind('/') + 1:]
+            self.data_signs['filename'][i] = new_file_name
         self.data_signs = self.data_signs.rename(columns={'filename': 'file'})
 
     def merge_data_frames_and_del_duplicates(self):
@@ -158,31 +157,20 @@ class SignsMerger:
     def merge_similar_signs(self, data):
         self.signs = data
         length = len(self.signs)
-        max_distance = 10
+        max_distance = 5
         i = 0
-        print(self.signs)
         while i != length:
             flag = True
             sign_1 = self.signs[i]
-            if sign_1.color is None:
-                sign_1.color = "#" + ''.join([random.choice('0123456789ABCDEF') for j in range(6)])
-                folium.CircleMarker(location=[sign_1.x, sign_1.y], radius=1,
-                                    popup=sign_1.file + "\n" + sign_1.class_name, color=sign_1.color).add_to(map)
-            sign_1.x_arr.append(sign_1.x)
-            sign_1.y_arr.append(sign_1.y)
             for j in range(i + 1, length):
                 sign_2 = self.signs[j]
                 coordinate_sign_1 = (sign_1.x, sign_1.y)
                 coordinate_sign_2 = (sign_2.x, sign_2.y)
                 if sign_1.class_name == sign_2.class_name and \
                         geodesic(coordinate_sign_1, coordinate_sign_2).meters < max_distance:
-                    sign_2.color = sign_1.color
-                    folium.CircleMarker(location=[sign_2.x, sign_2.y], radius=1,
-                                        popup=sign_2.file + "\n" + sign_2.class_name, color=sign_2.color).add_to(map)
                     sign_2.x_arr.extend(sign_1.x_arr)
                     sign_2.y_arr.extend(sign_1.y_arr)
-                    sign_2.x_arr.append(sign_2.x)
-                    sign_2.y_arr.append(sign_2.y)
+                    sign_2.files.extend(sign_1.files)
                     flag = False
                     sign_2.x = (sign_2.x + sign_1.x) / 2
                     sign_2.y = (sign_2.y + sign_1.y) / 2
@@ -190,10 +178,52 @@ class SignsMerger:
                     self.signs.pop(i)
                     break
             if flag:
-                self.signs[i] = sign_1
                 i += 1
             else:
                 length = len(self.signs)
+        for i in range(length):
+            sign = self.signs[i]
+            sign.x = numpy.average(sign.x_arr)
+            sign.y = numpy.average(sign.y_arr)
+            self.signs[i] = sign
+        return self.signs
+
+    # второй алгоритм сортировки (представлен для сравнения с первым)
+    def merge_similar_signs_1(self, data):
+        self.signs = data
+        length = len(self.signs)
+        max_distance = 10
+        flag_unique = 1
+        while flag_unique:
+            i = 0
+            flag_unique = 0
+            while i != length:
+                flag = False
+                sign_1 = self.signs[i]
+                for j in range(i + 1, length):
+                    sign_2 = self.signs[j]
+                    coordinate_sign_1 = (sign_1.x, sign_1.y)
+                    coordinate_sign_2 = (sign_2.x, sign_2.y)
+                    if sign_1.class_name == sign_2.class_name and \
+                            geodesic(coordinate_sign_1, coordinate_sign_2).meters < max_distance:
+                        flag_unique = 1
+                        sign_1.x_arr.extend(sign_2.x_arr)
+                        sign_1.y_arr.extend(sign_2.y_arr)
+                        sign_1.files.extend(sign_2.files)
+                        flag = True
+                        sign_1.x = (sign_2.x + sign_1.x) / 2
+                        sign_1.y = (sign_2.y + sign_1.y) / 2
+                        self.signs[i] = sign_1
+                        self.signs.pop(j)
+                        break
+                if flag:
+                    length = len(self.signs)
+                i += 1
+        for i in range(length):
+            sign = self.signs[i]
+            sign.x = numpy.average(sign.x_arr)
+            sign.y = numpy.average(sign.y_arr)
+            self.signs[i] = sign
         return self.signs
 
 
@@ -201,13 +231,13 @@ class SignsWriter:
     def __init__(self):
         self.signs = None
 
-    def add_data(self, sign):
-        self.signs = sign
-
-    def save(self):
-        df = pd.DataFrame(self.signs, columns=['filename', 'x', 'y', 'class_name', 'x_min', 'y_min', 'x_max', 'y_max',
-                                               'color'])
-        return df.to_csv('test_final.csv')
+    def save(self, file, sign_group):
+        self.signs = sign_group
+        df = pd.DataFrame(columns=['filename', 'x', 'y', 'class_name', 'x_min', 'y_min', 'x_max', 'y_max'])
+        for sign in self.signs:
+            df.loc[len(df.index)] = [sign.file, sign.x, sign.y, sign.class_name, sign.x_min, sign.y_min, sign.x_max,
+                                     sign.y_max]
+        df.to_csv(file)
 
 
 def distance_to_sign_in_frame(x_min, x_max):
@@ -250,19 +280,41 @@ def sign_coordinate_calculation(distance_to_sign, x_coordinate_of_the_car, y_coo
     return x_coordinate_of_the_sign, y_coordinate_of_the_sign
 
 
+def visualization(signs_group):
+    sign_map = folium.Map(location=[signs_group[0].x, signs_group[0].y], zoom_start=15)
+    for sign in signs_group:
+        color = "#" + ''.join([random.choice('0123456789ABCDEF') for j in range(6)])
+        size = len(sign.x_arr)
+        for i in range(size):
+            x = sign.x_arr[i]
+            y = sign.y_arr[i]
+            folium.PolyLine([(x, y), (sign.x, sign.y)],
+                            tooltip=sign.files[i] + "\n" + sign.class_name,
+                            color=color,
+                            weight=1,
+                            opacity=0.8).add_to(sign_map)
+        folium.CircleMarker(location=[sign.x, sign.y], radius=1,
+                            popup=sign.file + "\n" + sign.class_name + '\n' + '\n'.join(sign.files),
+                            color=color).add_to(sign_map)
+    # На карте вы увидите точки и исходящие из них отрезки, то где раньше располагался распознанный знак. Точка на карте
+    # это конечный знак, который пошел в выходной файл
+    sign_map.save("test_final.html")
+
+
 parser = argparse.ArgumentParser(description='Process some files.')
-parser.add_argument('--file_in', type=str, help='Input file path for car data')
+parser.add_argument('--file_in_1', type=str, help='Input file path for car data')
+parser.add_argument('--file_in_2', type=str, help='Input file path for sign data')
 parser.add_argument('--file_out', type=str, help='Input file path for sign data')
 args = parser.parse_args()
 
-if args.file_in and args.file_out:
-    file_1 = args.file_in
-    file_2 = args.file_out
+if args.file_in_1 and args.file_in_2 and args.file_out:
+    file_1 = args.file_in_1
+    file_2 = args.file_in_2
+    file_3 = args.file_out
 else:
     print("Please provide both input and output file paths using --file_in and --file_out options.")
     exit()
-# f1 = "digest.csv"
-# f2 = "20230520-203319_predictions.csv"
+start = time.time()
 loader = TrackLoader()
 data_car = loader.load(file_1)
 data_signs = loader.load(file_2)
@@ -271,6 +323,12 @@ track.renaming()
 track.merge_data_frames_and_del_duplicates()
 to_merge = track.get_track_with_signs()
 merger = SignsMerger()
-sign_groups = merger.merge_similar_signs(to_merge)
-
-# python your_script.py --file_in path_to_digest.csv --file_out path_to_20230520-203319_predictions.csv
+sign_groups = merger.merge_similar_signs_1(to_merge)
+writer = SignsWriter()
+writer.save(file_3, sign_groups)
+visualization(sign_groups)
+end = time.time()
+print('TIME: ', end - start)
+# строка для запуска через терминал
+# python review_3.py --file_in_1 digest.csv --file_in_2 20230520-203319_predictions.csv --file_out test_final.csv
+# работа над bash скриптом активно идет, пока скидываем то что имеем
