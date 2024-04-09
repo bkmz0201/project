@@ -325,8 +325,6 @@ to_merge = track.get_track_with_signs()
 merger = SignsMerger()
 sign_groups = merger.merge_similar_signs_1(to_merge)
 writer = SignsWriter()
-writer.save(file_3, sign_groups)
-visualization(sign_groups)
 end = time.time()
 print('TIME: ', end - start)
 # строка для запуска через терминал

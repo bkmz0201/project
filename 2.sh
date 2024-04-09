@@ -1,7 +1,10 @@
 #!/bin/bash
-
+python -m venv
+pip install pandas
+pip install geopy
+pip install folium
 # Проверка, существует ли Python скрипт
-python_script="review_3.py"
+python_script="review_4.py"
 if [ ! -f "$python_script" ]; then
     echo "Ошибка: Python скрипт '$python_script' не найден."
     exit 1
