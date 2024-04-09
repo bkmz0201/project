@@ -315,4 +315,5 @@ visualization(sign)
 end = time.time()
 
 print('TIME: ', end - start)
+# Запуск
 # python script.py --file_in_1 digest.csv --file_in_2 20230520-203319_predictions.csv --file_out test_final.csv
