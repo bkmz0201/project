@@ -1,4 +1,5 @@
 import pandas as pd
+from load_file import LoadFile
 
 
 class InformationForCalculation:

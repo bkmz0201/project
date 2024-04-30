@@ -18,6 +18,12 @@ class LoadFile:
             for index, row in self.data_in.iterrows():
                 self.data.append(AiInput(*list(row)))
 
+    def get_data(self):
+        return self.data
+
+    def get_data_in_dataframe(self):
+        return self.data_in
+
 
 def filenames_rename(data):
     # преобразование строки вида

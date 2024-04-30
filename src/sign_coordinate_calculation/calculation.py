@@ -1,7 +1,8 @@
-from mercator import wgs84_to_mercator, mercator_to_wgs84
+from merge_file import MergeFile
 from math import *
 import math
 from geopy.distance import geodesic
+from pyproj import Transformer
 
 class Sign:
     def __init__(self, file: str, x: float, y: float, class_name: str, x_min: int, y_min: int, x_max: int, y_max: int):
@@ -30,10 +31,10 @@ class ReceiveSign:
             camera_direction = data.file[-6]
             new_heading = direction_offset(data.x_min, data.x_max, data.heading, camera_direction)
             distance_to_sign = distance_to_sign_in_frame(data.x_min, data.x_max)
-            print(data.x, 'fff', data.y)
+            # print(data.x, 'fff', data.y)
             sign_x_coordinate, sign_y_coordinate = sign_coordinate_calculation(distance_to_sign, data.y, data.x,
                                                                                new_heading)
-            self.signs.append(Sign(data.file, sign_x_coordinate, sign_y_coordinate, data.class_name, data.x_min,
+            self.signs.append(Sign(data.file, sign_y_coordinate, sign_x_coordinate, data.class_name, data.x_min,
                                    data.y_min, data.x_max, data.y_max))
 
     def get_data(self):
@@ -74,10 +75,11 @@ def direction_offset(rectangle_x_min, rectangle_x_max, car_azimuth, camera_numbe
         car_azimuth += 360
     return car_azimuth + offset
 
-# Вычисление координаты знака
 def sign_coordinate_calculation(distance_to_sign, latitude_car, longitude_car, heading):
-    x_coordinate_car, y_coordinate_car = wgs84_to_mercator(latitude_car, longitude_car)
+    wgs84_to_mercator = Transformer.from_crs(4326, 3857)
+    mercator_to_wgs84 = Transformer.from_crs(3857, 4326)
+    x_coordinate_car, y_coordinate_car = wgs84_to_mercator.transform(latitude_car, longitude_car)
     x_coordinate_sign = distance_to_sign * cos(radians(heading)) + x_coordinate_car
     y_coordinate_sign = distance_to_sign * sin(radians(heading)) + y_coordinate_car
-    latitude_sign, longitude_sign = mercator_to_wgs84(x_coordinate_sign, y_coordinate_sign)
+    latitude_sign, longitude_sign = mercator_to_wgs84.transform(x_coordinate_sign, y_coordinate_sign)
     return latitude_sign, longitude_sign

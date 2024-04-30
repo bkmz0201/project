@@ -1,4 +1,5 @@
 import numpy
+from geopy.distance import geodesic
 
 
 class RemoveDuplicatesSign:
@@ -12,7 +13,7 @@ class RemoveDuplicatesSign:
     def merge_similar_signs(self, data):
         self.signs = data
         length = len(self.signs)
-        max_distance = 5
+        max_distance = 10
         i = 0
         while i != length:
             flag = True

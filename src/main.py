@@ -3,8 +3,8 @@ import argparse
 from remove_dublication import RemoveDuplicatesSign
 from merge_file import MergeFile
 from visualization import visualization
-from load_data import LoadFile
-from receive_sign import ReceiveSign
+from load_file import LoadFile
+from sign_coordinate_calculation import ReceiveSign
 from save_file import save_file
 import time
 
@@ -35,9 +35,10 @@ if __name__ == "__main__":
     to_file = unique_sign.merge_similar_signs(sign.get_data())
     save_file(file_3, to_file)
 
-    visualization(sign)
+    visualization(to_file)
     end = time.time()
 
     print('TIME: ', end - start)
 
-# python new_script.py --file_in_1 digest.csv --file_in_2 20230520-203319_predictions.csv --file_out test_final.csv
+# python new_script.py --file_in_1 digest.csv --file_in_2 20230520-203319_predictions.csv --file_out C:/Users/user/Documents/IT/ADGRS
+# project/input_file_for_test/output_file/test_final.csv

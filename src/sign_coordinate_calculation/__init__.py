@@ -1,1 +1,1 @@
-from .receive_sign import ReceiveSign
+from .calculation import ReceiveSign
