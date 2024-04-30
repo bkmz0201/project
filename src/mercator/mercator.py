@@ -1,4 +1,5 @@
 import math
+from math import *
 
 
 def wgs84_to_mercator(latitude, longitude):

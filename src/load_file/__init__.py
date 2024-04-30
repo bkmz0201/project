@@ -1,1 +1,1 @@
-from .load_data import LoadFile
+from .load import LoadFile

@@ -1,1 +1,1 @@
-from .merge_file import MergeFile
+from .merge_file import MergeFile, InformationForCalculation

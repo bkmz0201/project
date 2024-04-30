@@ -1,4 +1,5 @@
 import pandas as pd
+from load_file import LoadFile
 
 
 class InformationForCalculation:
@@ -39,4 +40,3 @@ class MergeFile:
 
     def get_data_in_dataframe(self):
         return self.combined_data_frame
-

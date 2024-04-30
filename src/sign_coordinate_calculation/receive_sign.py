@@ -1,7 +1,10 @@
 from mercator import wgs84_to_mercator, mercator_to_wgs84
 from math import *
+from merge_file import MergeFile, InformationForCalculation
+
 import math
 from geopy.distance import geodesic
+
 
 class Sign:
     def __init__(self, file: str, x: float, y: float, class_name: str, x_min: int, y_min: int, x_max: int, y_max: int):
@@ -16,7 +19,6 @@ class Sign:
         self.x_arr = [x]
         self.y_arr = [y]
         self.files = [file]
-
 
 
 # Класс для вычисления координат знаков из полученных данных
@@ -73,6 +75,7 @@ def direction_offset(rectangle_x_min, rectangle_x_max, car_azimuth, camera_numbe
     elif car_azimuth < 0:
         car_azimuth += 360
     return car_azimuth + offset
+
 
 # Вычисление координаты знака
 def sign_coordinate_calculation(distance_to_sign, latitude_car, longitude_car, heading):

@@ -1,5 +1,3 @@
-
-
 class MachineInput:
     def __init__(self, file: str, x: float, y: float, time: int, speed: float, heading: float, altitude: float,
                  offset: int):

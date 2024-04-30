@@ -1,13 +1,12 @@
 # Подключение библиотек
 import argparse
 from remove_dublication import RemoveDuplicatesSign
-from merge_file import MergeFile
+from merge_file import MergeFile, InformationForCalculation
 from visualization import visualization
-from load_data import LoadFile
+from load import LoadFile
 from receive_sign import ReceiveSign
 from save_file import save_file
 import time
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some files.')

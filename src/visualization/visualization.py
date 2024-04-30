@@ -1,4 +1,5 @@
 import folium
+import random
 
 
 def visualization(signs_group):
@@ -18,4 +19,4 @@ def visualization(signs_group):
                             popup=sign.file + "\n" + sign.class_name + '\n' + '\n'.join(sign.files),
                             color=color).add_to(sign_map)
 
-    sign_map.save("test_final.html")
+    sign_map.save("C:\Users\Илья\PycharmProjects\project\output_file\test_final.html")
